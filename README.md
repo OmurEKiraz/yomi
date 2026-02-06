@@ -58,7 +58,7 @@ Downloads and converts chapters into single files
 ##### python -m yomi.cli download -u "URL_HERE" -f pdf
 # 🎯 Range Selection
 Download specific chapters, ranges, or fill missing gaps.
-# Download only chapters 10 through 20
+#### Download only chapters 10 through 20
 ##### python -m yomi.cli download -u "URL_HERE" -r "10-20"
 #⚡ Turbo Mode (Speed)
 Increase the worker threads. Default is 4.Warning: Setting this too high (e.g., 32+) might cause temporary IP bans on some sites.
