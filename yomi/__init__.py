@@ -1,9 +1,9 @@
 """
-YOMI - Speed Organized Manga Downloader
+YOMI - The Universal Hybrid-Engine Manga Downloader
 """
 
-__version__ = "0.4.0"
-__author__ = "Omur"
+__version__ = "0.1.0"
+__author__ = "Omur Ege Kiraz"
+__license__ = "MIT"
 
-# Expose the main engine for easy import
 from .core import YomiCore

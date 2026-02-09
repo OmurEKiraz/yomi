@@ -4,34 +4,39 @@ import shutil
 import json
 import asyncio
 import aiohttp
+import requests
 from urllib.parse import unquote
 from difflib import SequenceMatcher
 
-# Rich Kütüphanesi (Görsellik)
+# Rich Library (UI)
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 from rich.logging import RichHandler
 from rich.console import Console
 from rich.table import Table
 from rich.prompt import IntPrompt
 
-# Import Async Extractor & Utils
-from .extractors.common import AsyncGenericMangaExtractor
+# Internal Imports
 from .database import YomiDB
 from .utils.archive import create_cbz_archive, create_pdf_document
 from .utils.metadata import parse_chapter_metadata
 from .utils.anilist import AniListProvider
+from .extractors.common import AsyncGenericMangaExtractor
 
-# Import Hunter (Opsiyonel)
+# Optional Hunter Import
 try:
     from .discovery import MirrorHunter
 except ImportError:
     MirrorHunter = None
 
-# Logger Ayarları
+# Logger Configuration
 logging.basicConfig(
     level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(markup=True)]
 )
 logger = logging.getLogger("YomiCore")
+
+# CONSTANTS
+# This URL will act as the "Live Database". Users get new sites without updating the package.
+REMOTE_DB_URL = "https://raw.githubusercontent.com/OmurEKiraz/yomi-core/main/yomi/sites.json"
 
 class YomiCore:
     def __init__(self, output_dir: str = "downloads", workers: int = 8, debug: bool = False, format: str = "folder", proxy: str = None):
@@ -42,7 +47,7 @@ class YomiCore:
         self.proxy = proxy
         self.console = Console()
         
-        # AniList Sağlayıcısını Başlat
+        # Initialize Metadata Provider
         self.anilist = AniListProvider()
         
         if self.debug:
@@ -53,90 +58,95 @@ class YomiCore:
         
         os.makedirs(self.output_dir, exist_ok=True)
         self.db = YomiDB(os.path.join(output_dir, "history.db"))
+        
+        # Load Configuration (Remote -> Local Fallback)
         self.sites_config = self._load_sites_config()
 
-    def _load_sites_config(self):
+    def _load_sites_config(self) -> dict:
+        """
+        Loads the site database.
+        Priority:
+        1. Remote GitHub 'sites.json' (Main Branch)
+        2. Local package 'sites.json' (Fallback)
+        """
         config = {}
-        base_dir = os.path.dirname(__file__)
         
-        # 1. Önce Dev Topluluk Listesini Yükle (Varsa)
-        bulk_path = os.path.join(base_dir, "sites_bulk.json") # Botun oluşturacağı dosya
-        if os.path.exists(bulk_path):
-            try:
-                with open(bulk_path, "r", encoding="utf-8") as f:
-                    bulk_data = json.load(f)
-                    config.update(bulk_data)
-                    if self.debug: print(f"📚 Loaded {len(bulk_data)} sites from Community DB.")
-            except Exception as e:
-                print(f"⚠️ Failed to load bulk sites: {e}")
+        # 1. Attempt Remote Fetch
+        try:
+            if self.debug: logger.debug(f"Attempting to fetch remote DB from: {REMOTE_DB_URL}")
+            # Short timeout (3s) to prevent hanging if offline
+            response = requests.get(REMOTE_DB_URL, timeout=3) 
+            if response.status_code == 200:
+                remote_data = response.json()
+                config.update(remote_data)
+                if self.debug: logger.info(f"✅ Loaded {len(remote_data)} sites from Remote DB.")
+            else:
+                if self.debug: logger.warning(f"⚠️ Remote DB unreachable (Status: {response.status_code}). Using local DB.")
+        except Exception as e:
+            if self.debug: logger.warning(f"⚠️ Remote DB fetch failed: {e}")
 
-        # 2. Sonra Senin Test Listeni Yükle (Varsa)
-        test_path = os.path.join(base_dir, "sites_test.json")
-        if os.path.exists(test_path):
-             try:
-                with open(test_path, "r", encoding="utf-8") as f:
-                    test_data = json.load(f)
-                    config.update(test_data) # Üstüne yazar
-             except: pass
+        # 2. Local Fallback (If remote failed or to supplement)
+        if not config:
+            base_dir = os.path.dirname(__file__)
+            local_path = os.path.join(base_dir, "sites.json")
+            
+            if os.path.exists(local_path):
+                try:
+                    with open(local_path, "r", encoding="utf-8") as f:
+                        local_data = json.load(f)
+                        config.update(local_data)
+                        if self.debug: logger.info(f"📂 Loaded {len(local_data)} sites from Local DB.")
+                except Exception as e:
+                    logger.error(f"❌ Critical: Failed to load local database: {e}")
+            else:
+                logger.error("❌ Critical: Local sites.json not found in package.")
 
-        # 3. EN SON Senin "Elite" Listeni Yükle (sites.json)
-        # Bu en son yüklenir ki, senin elle yazdığın ayarlar diğerlerini ezsin (Override).
-        main_path = os.path.join(base_dir, "sites.json")
-        if os.path.exists(main_path):
-            try:
-                with open(main_path, "r", encoding="utf-8") as f:
-                    main_data = json.load(f)
-                    config.update(main_data)
-                    if self.debug: print(f"💎 Loaded {len(main_data)} Elite sites.")
-            except:
-                pass
-                
         return config
 
     async def _resolve_target(self, input_str: str):
         """
-        Hedefi analiz eder:
-        1. Direkt URL mi?
-        2. Tam eşleşme mi?
-        3. Benzerlik var mı? (Fuzzy Search)
+        Analyzes the input target:
+        1. Is it a direct URL?
+        2. Is it an exact key match?
+        3. Is it a fuzzy match?
         """
-        # 1. Direkt URL kontrolü
+        # 1. Direct URL Check
         if input_str.startswith("http"): return input_str
         
         clean_input = unquote(input_str).strip().lower()
         
-        # 2. Tam Eşleşme (%100)
+        # 2. Exact Match
         if clean_input in self.sites_config:
             return await self._finalize_target(clean_input)
 
-        # 3. Bulanık Arama (Fuzzy Search)
+        # 3. Fuzzy Search
         matches = []
         for key, data in self.sites_config.items():
             site_name = data.get('name', '').lower()
             
-            # Hem 'key' (one-piece) hem 'name' (One Piece) ile benzerliğe bak
+            # Check similarity against both 'key' and 'name'
             ratio_key = SequenceMatcher(None, clean_input, key).ratio()
             ratio_name = SequenceMatcher(None, clean_input, site_name).ratio()
             score = max(ratio_key, ratio_name) * 100 
             
-            if score > 40: # %40 altını hiç gösterme
+            if score > 40: # Threshold
                 matches.append((score, key, data['name']))
 
-        # Skorlara göre sırala
+        # Sort by score desc
         matches.sort(key=lambda x: x[0], reverse=True)
         
         if not matches:
-            print(f"⚠️ No matches found for '{input_str}'. Trying as direct link...")
+            if self.debug: logger.warning(f"⚠️ No matches found for '{input_str}'. Treating as direct link.")
             return input_str
 
         top_score, top_key, top_name = matches[0]
 
-        # SENARYO A: Çok yüksek benzerlik (%80 üstü) -> OTOMATİK
+        # Scenario A: High Confidence -> Auto-Select
         if top_score >= 80:
             self.console.print(f"✨ Auto-Match: [bold green]{top_name}[/] (Confidence: {int(top_score)}%)")
             return await self._finalize_target(top_key)
         
-        # SENARYO B: Arada kaldıysa -> KULLANICIYA SOR
+        # Scenario B: Ambiguous -> User Prompt
         else:
             self.console.print(f"\n🔍 [yellow]Ambiguous input '{input_str}'. Did you mean one of these?[/]")
             
@@ -145,7 +155,7 @@ class YomiCore:
             table.add_column("Site Name", style="cyan")
             table.add_column("Confidence", justify="right")
             
-            options = matches[:5] # İlk 5 sonucu göster
+            options = matches[:5]
             for idx, (score, key, name) in enumerate(options, 1):
                 color = "green" if score > 60 else "yellow"
                 table.add_row(str(idx), name, f"[{color}]{int(score)}%[/]")
@@ -162,7 +172,7 @@ class YomiCore:
             return await self._finalize_target(selected_key)
 
     async def _finalize_target(self, target_key):
-        """Anahtar (key) bulunduktan sonra URL'i çözer (MirrorHunter varsa çalıştırır)"""
+        """Resolves the final URL for a given database key."""
         site_data = self.sites_config[target_key]
         site_type = site_data.get("type", "static")
         
@@ -210,10 +220,11 @@ class YomiCore:
 
             manga_title = manga_info['title']
             
-            # --- ANILIST METADATA ÇEKİMİ ---
-            print(f"🧬 Fetching AniList Metadata for '{manga_title}'...")
+            # --- Metadata Fetching ---
+            print(f"🧬 Fetching Metadata for '{manga_title}'...")
             rich_meta = await self.anilist.fetch_metadata(manga_title)
             
+            # Sanitization
             safe_title = "".join([c for c in manga_title if c.isalnum() or c in (' ', '-', '_')]).strip()
             manga_path = os.path.join(self.output_dir, safe_title)
             os.makedirs(manga_path, exist_ok=True)
@@ -269,10 +280,10 @@ class YomiCore:
             return chapters
 
     async def _download_single_chapter(self, extractor, chapter, parent_path, manga_title, progress, rich_meta=None):
-        # 1. Bölüm bazlı temel meta (Sayı, başlık)
+        # 1. Base Metadata
         base_meta = parse_chapter_metadata(chapter['title'], manga_title, chapter['url'])
         
-        # 2. AniList verisiyle birleştir (Yazar, Tür, Özet)
+        # 2. Rich Metadata Merge
         full_meta = {**base_meta}
         if rich_meta:
             full_meta.update(rich_meta)
@@ -309,7 +320,6 @@ class YomiCore:
             
             elif self.format == "cbz":
                 cbz_path = os.path.join(parent_path, f"{clean_title}.cbz")
-                # Zenginleştirilmiş Metadata ile CBZ oluştur
                 if await loop.run_in_executor(None, create_cbz_archive, chapter_folder, cbz_path, full_meta):
                     shutil.rmtree(chapter_folder)
                     success = True
@@ -318,7 +328,7 @@ class YomiCore:
 
             if success:
                 self.db.mark_completed(manga_title, chapter['title'])
-                # Ekrana basarken Yazarı da göster (Hava atma noktası)
+                # Display Author Info if available
                 author_txt = f" | {full_meta.get('writer')}" if full_meta.get('writer') else ""
                 progress.console.print(f"[green]✅ Finished: {clean_title} (Meta: #{full_meta['number']}{author_txt})[/green]")
 

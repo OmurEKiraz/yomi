@@ -3,43 +3,33 @@ from urllib.parse import unquote
 
 def parse_chapter_metadata(chapter_title: str, series_title: str, url: str) -> dict:
     """
-    Hem BAŞLIKTAN hem de URL'den bölüm numarası avlayan akıllı fonksiyon.
+    Extracts chapter number and subtitle from both the Chapter Title and URL.
+    This dual-check ensures higher accuracy for oddly named chapters.
     """
     meta_number = ""
     meta_subtitle = ""
     
-    # 1. TEMİZLİK: Başlık ve URL'i analize hazırla
+    # 1. Cleanup: Prepare inputs for analysis
     clean_title = chapter_title.strip()
-    clean_url = unquote(url).strip().lower() # URL'deki %20'leri temizle
+    clean_url = unquote(url).strip().lower()
     
-    # --- YÖNTEM A: Başlıktan Dene (Klasik) ---
-    # Regex: Chapter/Ch/No kelimesinden sonraki sayıyı yakalar
-    match_title = re.search(r'(?:chapter|ch\.?|no\.?|episode)\s*(\d+(\.\d+)?)', clean_title, re.IGNORECASE)
+    # --- METHOD A: Try from Title ---
+    # Regex catches: Chapter X, Ch. X, No. X, Episode X
+    match_title = re.search(r'(?:chapter|ch\\.?|no\\.?|episode)\s*(\d+(\.\d+)?)', clean_title, re.IGNORECASE)
     
     if match_title:
         meta_number = match_title.group(1)
-        # Alt başlığı ayıkla (Chapter 5: The End -> The End)
-        meta_subtitle = re.sub(r'(?:chapter|ch\.?|no\.?|episode)\s*(\d+(\.\d+)?)[\s:-]*', '', clean_title, flags=re.IGNORECASE).strip()
+        # Isolate subtitle (e.g., "Chapter 5: The End" -> "The End")
+        meta_subtitle = re.sub(r'(?:chapter|ch\\.?|no\\.?|episode)\s*(\d+(\.\d+)?)[\\s:-]*', '', clean_title, flags=re.IGNORECASE).strip()
     
-    # --- YÖNTEM B: Başlık Çuvalladıysa URL'e Bak (Senin istediğin özellik) ---
+    # --- METHOD B: Fallback to URL ---
     if not meta_number:
-        # Link genelde şöyledir: .../bleach-chapter-5 veya .../chapter-5-raw
-        # URL'in sonundaki veya ortasındaki "chapter-5" yapısını arıyoruz
-        match_url = re.search(r'(?:chapter|ch|c)[-_]?(\d+(\.\d+)?)', clean_url)
-        
+        # Look for patterns like /chapter-123/ or /c123/ in URL
+        match_url = re.search(r'/(?:chapter|ch|c)[-/_]?(\d+(\.\d+)?)(?:/|$)', clean_url)
         if match_url:
-            print(f"⚠️ Title confusing ('{clean_title}'). Extracted #{match_url.group(1)} from URL instead.")
             meta_number = match_url.group(1)
-            meta_subtitle = f"Chapter {meta_number}" # Başlık yoksa uydur
-
-    # Hâlâ numara yoksa (Örn: "Oneshot")
-    if not meta_number:
-        # Son çare: Başlıktaki İLK sayıyı al (Tehlikeli ama bazen işe yarar)
-        match_fallback = re.search(r'(\d+(\.\d+)?)', clean_title)
-        if match_fallback:
-             meta_number = match_fallback.group(1)
         else:
-             meta_number = "0" # Hiçbir şey yoksa 0 ver
+             meta_number = "0" # Default if nothing found
 
     if not meta_subtitle:
         meta_subtitle = clean_title
@@ -52,9 +42,10 @@ def parse_chapter_metadata(chapter_title: str, series_title: str, url: str) -> d
         "original_title": chapter_title
     }
 
-# generate_comic_info_xml FONKSİYONU AYNI KALACAK (Ona dokunmana gerek yok)
 def generate_comic_info_xml(metadata: dict) -> str:
-    # ... (eski kodun aynısı) ...
+    """
+    Generates a ComicInfo.xml string compliant with standard comic readers.
+    """
     def clean(val):
         return str(val).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -71,15 +62,13 @@ def generate_comic_info_xml(metadata: dict) -> str:
 
     return f"""<?xml version="1.0"?>
 <ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Title>{title}</Title>
   <Series>{series}</Series>
   <Number>{number}</Number>
+  <Title>{title}</Title>
+  <Web>{web}</Web>
   <Writer>{writer}</Writer>
   <Penciller>{artist}</Penciller>
   <Genre>{genres}</Genre>
   <Summary>{summary}</Summary>
   <Year>{year}</Year>
-  <Web>{web}</Web>
-  <Manga>YesAndRightToLeft</Manga>
-</ComicInfo>
-"""
+</ComicInfo>"""

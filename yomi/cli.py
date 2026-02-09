@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import time
-import math
 import rich_click as click
 from datetime import timedelta
 from rich.console import Console
@@ -11,19 +10,17 @@ from rich.table import Table
 from rich import box
 from rich.panel import Panel
 from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.style import Style
 
-# --- Core Module ---
+# --- Core Module Import ---
 try:
     from .core import YomiCore
+    from . import __version__ as VERSION
 except ImportError:
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from yomi.core import YomiCore
+    from yomi import __version__ as VERSION
 
-# --- CONSTANTS ---
-VERSION = "v0.4.1 (Stable)"
 APP_NAME = "YOMI CLI"
 
 # --- 1. Console & Logging Setup ---
@@ -42,7 +39,7 @@ click.rich_click.STYLE_HEADER_TEXT = "bold magenta"
 click.rich_click.STYLE_OPTION = "bold cyan"
 click.rich_click.STYLE_COMMAND = "bold green"
 
-# --- 3. FEATURED LIST (Curated Top Tier) ---
+# --- 3. FEATURED LIST ---
 FEATURED_MANGAS = {
     "one-piece", "bleach", "naruto", "dragon-ball", "hunter-x-hunter", 
     "jujutsu-kaisen", "chainsaw-man", "demon-slayer-kimetsu-no-yaiba", "my-hero-academia",
@@ -54,13 +51,14 @@ FEATURED_MANGAS = {
 
 # --- 4. CLI Group ---
 @click.group()
+@click.version_option(version=VERSION)
 def cli():
     """
-    [bold cyan]🐇 YOMI CLI[/] - [italic white]The Rabbit Hole of Manga Archiving[/]
+    [bold cyan]🐇 YOMI CLI[/] - [italic white]The Universal Hybrid-Engine Manga Downloader[/]
     """
     pass
 
-# --- 5. Download Command (Mission Debrief Upgrade) ---
+# --- 5. Download Command ---
 @cli.command()
 @click.option('-u', '--url', required=True, help="Target URL or Manga Name (Slug).")
 @click.option('-o', '--out', default='downloads', show_default=True, help="Output Directory.")
@@ -76,7 +74,7 @@ def download(url, out, workers, format, chapter_range, proxy, debug):
     if debug:
         logger.setLevel("DEBUG")
     
-    # --- A. MISSION BRIEFING (Start Screen) ---
+    # --- MISSION BRIEFING ---
     info_text = Text()
     info_text.append(f"🎯 Target:   ", style="bold cyan")
     info_text.append(f"{url}\n", style="white")
@@ -93,25 +91,19 @@ def download(url, out, workers, format, chapter_range, proxy, debug):
     panel = Panel(
         info_text,
         title=f"[bold green]🚀 {APP_NAME} INITIALIZED[/]",
-        subtitle=f"[dim]{VERSION}[/]",
+        subtitle=f"[dim]v{VERSION}[/]",
         border_style="green",
         expand=False
     )
     console.print(panel)
 
-    # --- B. EXECUTION ---
+    # --- EXECUTION ---
     start_time = time.time()
     
     try:
-        # Pre-flight Animation
         with console.status("[bold cyan]Establishing Uplink... Resolving Target...[/]", spinner="dots12"):
-             if not url.startswith("http"):
-                json_path = os.path.join(os.path.dirname(__file__), "sites.json")
-                if os.path.exists(json_path):
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        sites = json.load(f)
-                        # Just a check, logic is handled by core
-                time.sleep(0.8) # Cinematic effect
+             # Simulating check time / waiting for remote db
+             time.sleep(0.5)
 
         console.rule("[bold cyan]Extraction Matrix Active[/]")
         
@@ -124,7 +116,7 @@ def download(url, out, workers, format, chapter_range, proxy, debug):
         elapsed = end_time - start_time
         time_str = str(timedelta(seconds=int(elapsed)))
 
-        # --- C. MISSION DEBRIEF (Stats Report) ---
+        # --- DEBRIEF ---
         stats_grid = Table.grid(expand=True, padding=(0, 2))
         stats_grid.add_column(style="bold white")
         stats_grid.add_column(justify="right", style="bold green")
@@ -155,7 +147,7 @@ def download(url, out, workers, format, chapter_range, proxy, debug):
         if debug:
             logger.exception("Traceback:")
 
-# --- 6. Available Command (The Perfect Grid) ---
+# --- 6. Available Command ---
 @cli.command()
 @click.option('-s', '--search', help="Search for a manga.")
 @click.option('--all', 'show_all', is_flag=True, help="Show entire database.")
@@ -163,20 +155,16 @@ def available(search, show_all):
     """
     🌍 [bold]Library Grid[/] - [dim]Browse the supported collection.[/]
     """
-    json_path = os.path.join(os.path.dirname(__file__), "sites.json")
+    # Initialize engine just to load config (Remote or Local)
+    # This ensures CLI sees the same DB as the downloader
+    engine = YomiCore(workers=1) 
+    sites = engine.sites_config
     
-    if not os.path.exists(json_path):
-        console.print("[bold red]❌ Error:[/bold red] sites.json not found! Run aggregator first.")
+    if not sites:
+        console.print("[bold red]❌ Error:[/bold red] No site configuration loaded.")
         return
 
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            sites = json.load(f)
-    except json.JSONDecodeError:
-        console.print("[bold red]❌ Error:[/bold red] sites.json corrupted!")
-        return
-
-    # --- SEARCH MODE (List View) ---
+    # --- SEARCH MODE ---
     if search:
         search = search.lower().strip()
         results = []
@@ -206,7 +194,7 @@ def available(search, show_all):
         console.print(table)
         return
 
-    # --- GRID MODE (Responsive & Symmetrical) ---
+    # --- GRID MODE ---
     if show_all:
         display_keys = sorted(list(sites.keys()))
         title = f"📚 Full Archive ({len(sites)} Series)"
@@ -226,17 +214,15 @@ def available(search, show_all):
 
     console.rule(f"[{color_style}]{title}[/]")
 
-    # --- RESPONSIVE LAYOUT ENGINE ---
+    # Layout Engine
     width = console.size.width
-    card_width = 30 # Min width per card
+    card_width = 30 
     columns_count = max(1, width // card_width)
     
-    # Invisible Skeleton Table for Alignment
     layout_table = Table(box=None, show_header=False, padding=(0, 1), expand=True)
     for _ in range(columns_count):
         layout_table.add_column(ratio=1)
 
-    # Chunking & Building
     for i in range(0, len(display_keys), columns_count):
         row_keys = display_keys[i:i + columns_count]
         row_renderables = []
@@ -246,14 +232,12 @@ def available(search, show_all):
             name = data.get('name', key.replace("-", " ").title())
             domain = data.get('base_domain', 'Unknown')
             
-            # Smart Truncate
             safe_len = int(width / columns_count) - 6
             if safe_len < 15: safe_len = 15
             
             if len(name) > safe_len: name = name[:safe_len-3] + "..."
             if len(domain) > safe_len: domain = domain[:safe_len-3] + "..."
 
-            # The Card
             p = Panel(
                 f"[bold cyan]{name}[/]\n[dim white]{domain}[/]",
                 border_style=f"dim {color_style}",
@@ -261,12 +245,11 @@ def available(search, show_all):
             )
             row_renderables.append(p)
 
-        # Fill empty slots
         while len(row_renderables) < columns_count:
             row_renderables.append(Text(""))
 
         layout_table.add_row(*row_renderables)
-        layout_table.add_row(*[Text("") for _ in range(columns_count)]) # Spacer
+        layout_table.add_row(*[Text("") for _ in range(columns_count)])
 
     console.print(layout_table)
     

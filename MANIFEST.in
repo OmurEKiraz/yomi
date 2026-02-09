@@ -1,0 +1,4 @@
+include yomi/sites.json
+include README.md
+include LICENSE
+recursive-include yomi/utils *.json

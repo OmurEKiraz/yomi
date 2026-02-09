@@ -1,69 +1,82 @@
-# 🐇 Yomi: The Intelligent Manga Archiver
+# YOMI - The Universal Hybrid-Engine Manga Downloader
 
-> **"403 Forbidden? Not on my watch."**
->
-> *Auto-Discovery. Anti-Protection. Smart Metadata.*
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue?style=flat&logo=python)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+![Status](https://img.shields.io/badge/Status-Beta_v0.1.0-orange?style=flat)
 
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Stable_v0.2.0-orange?style=for-the-badge)
+**Yomi** is a command-line utility designed for the long-term archival of manga. It features a hybrid scraping engine that combines high-speed asynchronous requests with browser simulation to bypass modern bot protections (Cloudflare, DDOS-Guard).
 
-**Yomi** is not just a downloader; it is a full-stack **Manga Archival Solution**. It is designed to hunt down active mirror sites, bypass "Access Denied" image protections (like Nangca/CDN), and package your manga into professional, metadata-tagged formats ready for media servers like **Kavita**, **Komga**, or **CDisplayEx**.
+Unlike standard downloaders, Yomi focuses on **metadata integrity** and **mirror persistence**. It automatically fetches metadata (Author, Artist, Summary) from AniList and embeds it into `.cbz` files, making them ready for media servers and Comic Book Reader apps.
 
+## ✨ Key Features
 
-## ✨ Why Yomi?
+* **Dynamic Mirror Resolution:** Automatically detects when a site changes domains (e.g., `site-w1.com` -> `site-w2.com`) and updates the target on the fly using a remote database.
+* **Smart Metadata:** Fetches official metadata from AniList and embeds it directly into `ComicInfo.xml`.
+* **Hybrid Engine:** Uses `aiohttp` for speed and `curl_cffi` for bypassing anti-bot protections.
+* **Format Agnostic:** Export as raw directories, **PDF** documents, or **CBZ** archives.
+* **Remote Database:** Fetches the latest site definitions from GitHub on every run. No need to update the package manually for new mangas.
 
-### 🌍 1. The Hunter Engine (Auto-Discovery)
-Sites like *One Piece* or *Bleach* change domains constantly (w57 -> w58). Yomi's **Hunter Engine** automatically probes potential mirrors, finds the active one, and locks onto the target. You never have to update links manually.
-
-### 🕵️‍♂️ The Sherlock Engine (Deep Scan)
-Images hidden behind `403 Forbidden` or deeply nested inside HTML/JavaScript (Nangca CDNs)? **Sherlock** parses the raw HTML, regex-matches the protected assets, and extracts them with surgical precision.
-
-### 📚 The Librarian (Smart Metadata)
-Yomi doesn't just give you a file.
-* **PDF:** Clean, header-checked documents.
-* **CBZ:** Embeds `ComicInfo.xml` automatically. Your reader will know the *Series Name*, *Chapter Number*, and *Title* (e.g., "Chapter 1050: Honor") instantly.
-
-### ⚡ Turbo Mode
-Built with a multi-threaded core that acts like a DDoS attack (in a good way). Downloads entire volumes in seconds.
-
+---
 
 ## 🛠️ Installation
 
-# 1. Clone the repository
-git clone [https://github.com/OmurEKiraz/yomi.git](https://github.com/OmurEKiraz/yomi.git)
-cd yomi
+### Option 1: Install via PyPI (Recommended)
+The easiest way to install Yomi is through pip.
 
-# 2. Create a virtual environment (Recommended)
-##### python -m venv venv
-##### Windows: .\venv\Scripts\activate
-##### Linux/Mac: source venv/bin/activate
-
-# 3. Install requirements
-##### pip install -r requirements.txt
+###### pip install yomi-core
 
 
-# 📖 Command Cheat Sheet
-Yomi is controlled via the CLI. Here is everything you need to know.
-#### ⬇️ Basic Download
-Download chapters as images inside folders. 
-##### python -m yomi.cli download -u "[https://site.com/manga/series-name](https://site.com/manga/series-name)"
+### Option 2: Build from Source (For Developers)
+If you want to contribute or use the latest unreleased features:
 
-#### 📦 Archival Mode (PDF / CBZ)Recommended. 
-Downloads and converts chapters into single files
-.CBZ: Includes metadata (Best for Komga/Kavita)
-.PDF: Best for phone/tablet reading.
-##### python -m yomi.cli download -u "URL_HERE" -f cbz
-#### or
-##### python -m yomi.cli download -u "URL_HERE" -f pdf
-# 🎯 Range Selection
-Download specific chapters, ranges, or fill missing gaps.
-#### Download only chapters 10 through 20
-##### python -m yomi.cli download -u "URL_HERE" -r "10-20"
-#⚡ Turbo Mode (Speed)
-Increase the worker threads. Default is 4.Warning: Setting this too high (e.g., 32+) might cause temporary IP bans on some sites.
-# 16 Parallel Downloads
-##### python -m yomi.cli download -u "URL_HERE" -w 16
-# 🛡️ Proxy Support
-Bypass region blocks or IP bans.
-##### python -m yomi.cli download -u "URL_HERE" -p "[http://user:pass@1.2.3.4:8080](http://user:pass@1.2.3.4:8080)"
+
+###### git clone [https://github.com/OmurEKiraz/yomi-core.git](https://github.com/OmurEKiraz/yomi-core.git)
+###### cd yomi-core
+###### pip install .
+
+
+
+
+## 📖 Usage
+Yomi is controlled entirely via the Command Line Interface (CLI)
+##### 1. Basic CommandsTo see all available commands and options, use the help flag: 
+
+###### yomi --help
+
+
+##### 2. Downloading Manga
+You can download by providing a direct URL or a known slug.
+###### Basic Download (Default: Folder format): yomi download -u "[https://read-site.com/manga/bleach](https://read-site.com/manga/bleach)"
+###### Archival Format (.CBZ with Metadata):Best for cbz reader apps. yomi download -u "bleach" -f cbz
+###### Portable Format (.PDF):Best for tablets/phones.Bashyomi download -u "berserk" -f pdf
+
+##### 3. Advanced Options 
+
+###### -r / --rangeDownload specific chapters.-r "10-20" or -r "1050"
+
+###### -w / --workersSet concurrent download threads.-w 16 (Default: 8)
+
+###### -o / --outSet custom output directory.-o "D:/MangaArchive"
+
+###### -p / --proxyUse a proxy server.-p "http://127.0.0.1:8080"
+
+###### --debugEnable verbose logging for debugging.--debug
+
+## 4. Search & Library
+Check which sites are currently supported or search for a specific series in the database.
+
+#### Search for a series
+
+##### yomi available -s "vinland saga"
+
+####  List all supported sites
+
+##### yomi available --all
+
+# ⚙️ Configuration
+Yomi fetches its site configurations dynamically from the remote repository. You do not need to update the package manually to get support for new sites. The engine automatically checks for the latest definitions on every run.
+
+# ⚖️ Disclaimer
+Yomi is a tool developed for educational purposes and personal archiving for already open to public contents. The developers do not endorse or support copyright infringement. Please support the creators by purchasing official releases.
+
+License: MIT

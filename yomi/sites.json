@@ -1489,5 +1489,33 @@
     "base_domain": "yourtalentismine.com",
     "test_path": "/manga/your-talent-is-mine-chapter-1",
     "url_pattern": "{mirror}/manga/your-talent-is-mine-chapter-{chapter}"
+  },
+  "frieren-beyond-journeys-end": {
+    "name": "Frieren Beyond Journeys End",
+    "type": "dynamic",
+    "base_domain": "read-frieren-manga.com",
+    "test_path": "/manga/frieren-chapter-1",
+    "url_pattern": "{mirror}/manga/frieren-chapter-{chapter}"
+  },
+  "berserk-of-gluttony": {
+    "name": "Berserk Of Gluttony",
+    "type": "dynamic",
+    "base_domain": "berserk-manga.com",
+    "test_path": "/manga/berserk-chapter-1",
+    "url_pattern": "{mirror}/manga/berserk-chapter-{chapter}"
+  },
+  "gokurakugai-trouble-on-third-avenue": {
+    "name": "Gokurakugai Trouble On Third Avenue",
+    "type": "dynamic",
+    "base_domain": "gokurakugai.com",
+    "test_path": "/manga/gokurakugai-chapter-1",
+    "url_pattern": "{mirror}/manga/gokurakugai-chapter-{chapter}"
+  },
+  "gokurakugai-sanban-doori-no-ken": {
+    "name": "Gokurakugai Sanban Doori No Ken",
+    "type": "dynamic",
+    "base_domain": "gokurakugai.com",
+    "test_path": "/manga/gokurakugai-chapter-1",
+    "url_pattern": "{mirror}/manga/gokurakugai-chapter-{chapter}"
   }
 }
